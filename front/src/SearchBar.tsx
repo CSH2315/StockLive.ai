@@ -4,9 +4,11 @@ type SearchBarProps = {
   onSearch: (query: string) => void;
   placeholder?: string;
   defaultValue?: string;
-  className?: string; // 바깥 래퍼에 추가 클래스
+  className?: string;
   buttonText?: string;
   loading?: boolean;
+  value?: string;
+  onChangeText?: (v: string) => void;
 };
 
 export default function SearchBar({
@@ -39,7 +41,6 @@ export default function SearchBar({
 
       <div className="relative">
         <div className="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3">
-          {/* SVG 속성은 React에 맞게 camelCase로 */}
           <svg
             className="h-4 w-4 text-gray-500 dark:text-gray-400"
             aria-hidden="true"
