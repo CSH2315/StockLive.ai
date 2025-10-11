@@ -77,7 +77,7 @@ export default function AppHeader({
               placeholder={
                 market === "korean"
                   ? "종목명을 입력해 검색하세요"
-                  : "Search stock by name or ticker (e.g., 삼성전자, AAPL)"
+                  : "종목명 또는 ticker를 입력해 검색하세요"
               }
             />
           </div>

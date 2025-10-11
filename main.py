@@ -1,14 +1,15 @@
 import os
 import logging
-import pytz
-from datetime import datetime
-
 import requests
+import time
 from bs4 import BeautifulSoup
+from collections import Counter
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from suggest import router as suggest_router
+from urllib.parse import quote_plus
 
 
 app = FastAPI()
@@ -22,6 +23,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(suggest_router)
 
 
 @app.get("/")
@@ -39,6 +42,45 @@ YAHOO_API_HOST = "yahoo-finance15.p.rapidapi.com"
 class NewsText(BaseModel):
     news_text: str
 
+def fetch_korean_news(symbol: str, limit=20):
+    url = (
+        "https://search.naver.com/search.naver"
+        f"?where=news&query={quote_plus(symbol)}"
+    )
+    hdrs = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/124.0.0.0 Safari/537.36"
+        ),
+        "Accept-Language": "ko-KR,ko;q=0.9",
+        "Referer": "https://www.naver.com/",
+    }
+    html = requests.get(url, headers=hdrs, timeout=5).text
+    soup = BeautifulSoup(html, "html.parser")
+
+    cards = soup.select('div.hfG7LjyJAPmlsSM3W_Lz')[:limit]
+    news_list = []
+
+    for card in cards:
+        title_a = card.select_one('a[data-heatmap-target=".tit"]')
+        body_a = card.select_one('a[data-heatmap-target=".body"]')
+
+        # 프로필 블록에서 바로 시간 span 찾기
+        time_tag = card.select_one(
+            'div.sds-comps-horizontal-layout span.sds-comps-text-type-body2'
+        )
+
+        if not title_a:
+            continue
+
+        news_list.append({
+            "title": title_a.get_text(" ", strip=True),
+            "link": title_a["href"],
+            "description": body_a.get_text(" ", strip=True) if body_a else "No description",
+            "pubDate": time_tag.get_text(strip=True) if time_tag else "",
+        })
+    return news_list
 
 # 영어 감정 분석
 def analyze_sentiment_english(news_text):
@@ -135,59 +177,19 @@ def get_global_stock_news(symbol: str):
 # 국내주식: 네이버 웹 크롤링
 @app.get("/news/korea/{symbol}")
 def get_korean_stock_news(symbol: str):
-    base_url = "https://search.naver.com/search.naver?where=news&query="
-    search_url = base_url + symbol
-    headers = {"User-Agent": "Mozilla/5.0"}
-    response = requests.get(search_url, headers=headers)
-    soup = BeautifulSoup(response.text, "html.parser")
+    raw_articles = fetch_korean_news(symbol)
+    result = []
+    sentiment_counts = Counter({"positive":0, "negative":0, "neutral":0})
 
-    news_list = []
-    articles = soup.select("div.news_area")
-
-    sentiment_counts = {"positive": 0, "negative": 0, "neutral": 0}
-
-    for article in articles[:20]:
-        title = article.select_one("a.news_tit").text
-        link = article.select_one("a.news_tit").get("href")
-        description = article.select_one(".news_dsc").text if article.select_one(".news_dsc") else "No description"
-
-        # 개별 기사 페이지 요청
-        article_response = requests.get(link, headers=headers)
-        article_soup = BeautifulSoup(article_response.text, "html.parser")
-
-        # guid 역할 해줄 gdid 가져오기
-        gdid_element = article_soup.find("meta", {"property": "nv:news:article:gid"})
-        gdid = gdid_element["content"] if gdid_element else link
-
-        # 발행일 가져오기
-        pub_date_element = article_soup.find("meta", {"property": "article:published_time"})
-        pub_date_raw = pub_date_element["content"] if pub_date_element else None
-
-        if pub_date_raw:
-            if pub_date_raw.endswith("Z"):
-                pub_date_raw = pub_date_raw.replace("Z", "+00:00")
-            try:
-                pub_date_kr = datetime.fromisoformat(pub_date_raw)
-            except ValueError:
-                # 날짜 파싱 실패 시 처리
-                pub_date_kr = "Invalid date format"
-        else:
-            pub_date_kr = "No Date information"
-
-        # 감정 분석
-        sentiment = analyze_sentiment_korean(description)
+    for art in raw_articles:
+        sentiment = analyze_sentiment_korean(art["description"])
         sentiment_counts[sentiment] += 1
-
-        news_list.append({
-            "description": description,
-            "guid": gdid,
-            "link": link,
-            "pubDate": pub_date_kr,
-            "title": title,
-            "sentiment": sentiment
-        })
-
-    return {"symbol": symbol, "news": news_list}
+        result.append({**art, "sentiment": sentiment})
+    return {
+        "symbol": symbol,
+        "sentiment_counts": sentiment_counts,
+        "news": result
+        }
 
 
 
