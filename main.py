@@ -1,14 +1,14 @@
 import os
 import logging
 import requests
-import time
 from bs4 import BeautifulSoup
 from collections import Counter
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from suggest import router as suggest_router
+from routes.price import router as price_router
+from routes.suggest import router as suggest_router
 from urllib.parse import quote_plus
 
 
@@ -25,6 +25,7 @@ app.add_middleware(
 )
 
 app.include_router(suggest_router)
+app.include_router(price_router)
 
 
 @app.get("/")
