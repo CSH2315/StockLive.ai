@@ -46,3 +46,12 @@ StockLive.ai는 뉴스/주가 API 및 감성 분석 모델을 활용합니다.
 3) 접속 주소
    - 프론트엔드: http://localhost:8000
    - 백엔드: http://localhost:5173
+
+## 실행 화면
+<img width="2559" height="1395" alt="image" src="https://github.com/user-attachments/assets/4903c139-a366-42b9-860d-7802e908e0d6" />
+<img width="2559" height="1400" alt="image" src="https://github.com/user-attachments/assets/2dc7949f-4eac-47a8-a8d1-e5ae50ce6439" />
+<img width="2559" height="1400" alt="image" src="https://github.com/user-attachments/assets/94df773d-2356-4b3a-af15-d7bb204208ab" />
+<img width="2558" height="1397" alt="image" src="https://github.com/user-attachments/assets/72c0a61f-be68-41e0-b643-5e7b7ab921ee" />
+<img width="2559" height="1400" alt="image" src="https://github.com/user-attachments/assets/fcdf3781-c412-4e4e-8151-93c7319c1833" />
+
+
