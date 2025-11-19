@@ -12,13 +12,7 @@ type Props = {
   onSearch: (q: string) => void;
 };
 
-export default function AppHeader({
-  market,
-  setMarket,
-  query,
-  setQuery,
-  onSearch,
-}: Props) {
+export default function AppHeader({ market, setMarket, onSearch }: Props) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const showBack = pathname !== "/";
@@ -45,7 +39,7 @@ export default function AppHeader({
 
           <div className="flex-1 min-w-0 flex flex-col items-center">
             <div className="text-xl font-semibold leading-none tracking-tight">
-              AIStockHelper
+              StockLive.ai
             </div>
             <div className="mt-1">
               <MarketSegment value={market} onChange={setMarket} />
@@ -67,17 +61,15 @@ export default function AppHeader({
             </button>
           )}
           <div className="text-lg font-semibold leading-none tracking-tight">
-            AIStockHelper
+            StockLive.ai
           </div>
           <div className="flex-1 max-w-3xl ml-4">
             <SearchBar
-              value={query}
-              onChangeText={setQuery}
               onSearch={onSearch}
               placeholder={
                 market === "korean"
                   ? "종목명을 입력해 검색하세요"
-                  : "종목명 또는 ticker를 입력해 검색하세요"
+                  : "Ticker를 입력해 검색하세요"
               }
             />
           </div>

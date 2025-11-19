@@ -1,8 +1,9 @@
 from fastapi import APIRouter, HTTPException, Query
 from pykrx import stock
 from bs4 import BeautifulSoup
+from typing import Optional
 import pandas as pd
-import time, requests, functools, datetime as dt, pytz, math
+import re, time, requests, functools, datetime as dt, pytz, math
 
 router = APIRouter(prefix="/price")
 
@@ -68,75 +69,95 @@ def fetch_naver_price(code:str):
     return {"price": float(price), "currency": "KRW"}
 
 
-@router.get("/korea/{code}")
-def price_korean(
-    code: str,
-    days: int = Query(30, ge=1, le=3650),
-    debug: bool = Query(False)
-):
-    try:
-        # days를 무조건 int로
-        try:
-            days = int(days)
-        except Exception:
-            raise HTTPException(400, f"invalid days: {days!r}")
+def _normalize_kor(s: str) -> str:
+    # 공백 제거 + 소문자 (한글은 소문자 영향 없음, 영문 섞인 종목 대응)
+    return re.sub(r"\s+", "", s).lower()
 
+# 한 번 만들어두고 프로세스가 살아있는 동안 캐싱
+_name_to_code_map: Optional[dict[str, str]] = None
+
+def _build_name_code_map() -> dict[str, str]:
+    # KOSPI+KOSDAQ 전체 조회
+    tickers = stock.get_market_ticker_list(market="ALL")
+    m: dict[str, str] = {}
+    for code in tickers:
+        name = stock.get_market_ticker_name(code)  # 예: "삼성전자"
+        m[name] = code
+        m[_normalize_kor(name)] = code  # 정규화 키도 함께 저장(공백 제거 등)
+    return m
+
+def _resolve_korea_code(name_or_code: str) -> Optional[str]:
+    global _name_to_code_map
+    s = name_or_code.strip()
+
+    # 이미 6자리 숫자면 코드로 간주
+    if re.fullmatch(r"\d{6}", s):
+        return s
+
+    # 맵이 없으면 생성
+    if _name_to_code_map is None:
+        _name_to_code_map = _build_name_code_map()
+
+    # 1) 정확 일치
+    code = _name_to_code_map.get(s)
+    if code:
+        return code
+    # 2) 정규화(공백 제거) 일치
+    code = _name_to_code_map.get(_normalize_kor(s))
+    if code:
+        return code
+
+    # 3) 부분 일치(앞부분)
+    candidates = [v for k, v in _name_to_code_map.items() if not k.isdigit() and k.startswith(s)]
+    if candidates:
+        return candidates[0]
+
+    return None
+
+# ---------- 국내 차트(코드 기반) ----------
+@router.get("/korea/{code}")
+def price_korean(code: str, days: int = Query(30, ge=1, le=3650)):
+    try:
         end = dt.date.today()
         start = end - dt.timedelta(days=days)
         start_str = start.strftime("%Y%m%d")
         end_str = end.strftime("%Y%m%d")
 
         df = stock.get_market_ohlcv_by_date(start_str, end_str, code)
-
         if df is None or len(df) == 0:
-            return {"prices": [], "currency": "KRW", **({"_debug": {"empty": True}} if debug else {})}
+            return {"prices": [], "currency": "KRW"}
 
         if not isinstance(df.index, pd.DatetimeIndex):
             df.index = pd.to_datetime(df.index, errors="coerce")
-
         df = df[~df.index.isna()]
 
         need_cols = ["시가", "고가", "저가", "종가"]
-        for col in need_cols:
-            if col not in df.columns:
+        for c in need_cols:
+            if c not in df.columns:
                 raise HTTPException(502, f"PyKRX columns missing: {need_cols}, got {list(df.columns)}")
-
         df = df.dropna(subset=need_cols).astype({c: "float64" for c in need_cols})
 
-        if len(df) == 0:
-            return {"prices": [], "currency": "KRW", **({"_debug": {"after_dropna_empty": True}} if debug else {})}
-
         ts_ms = (df.index.astype("int64") // 1_000_000).astype("int64")
-
         prices = []
         for ts, row in zip(ts_ms, df.itertuples(index=False)):
-            o = getattr(row, "시가", None)
-            h = getattr(row, "고가", None)
-            l = getattr(row, "저가", None)
-            c = getattr(row, "종가", None)
-
-            if any(v is None or (isinstance(v, float) and math.isnan(v)) for v in (o, h, l, c)):
-                continue
-
             prices.append({
                 "ts": int(ts),
-                "open": float(o),
-                "high": float(h),
-                "low":  float(l),
-                "close":float(c),
+                "open": float(getattr(row, "시가")),
+                "high": float(getattr(row, "고가")),
+                "low":  float(getattr(row, "저가")),
+                "close":float(getattr(row, "종가")),
             })
-
-        payload = {"prices": prices, "currency": "KRW"}
-        if debug:
-            payload["_debug"] = {
-                "rows": len(df),
-                "index_type": str(type(df.index)),
-                "index_sample": df.index[:3].astype(str).tolist(),
-                "columns": df.columns.tolist(),
-            }
-        return payload
-
+        return {"prices": prices, "currency": "KRW"}
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(500, f"PyKRX error: {e}")
+
+# ---------- 국내 차트(이름 기반) ----------
+@router.get("/korea/by-name/{name}")
+def price_korean_by_name(name: str, days: int = Query(30, ge=1, le=3650)):
+    code = _resolve_korea_code(name)
+    if not code:
+        raise HTTPException(404, f"'{name}' 종목을 찾을 수 없습니다.")
+    # 코드 기반 엔드포인트 재사용
+    return price_korean(code, days)

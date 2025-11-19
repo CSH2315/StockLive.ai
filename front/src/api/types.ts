@@ -16,3 +16,16 @@ export type NewsResponse = {
   news: NewsItem[];
   sentimentCounts: Record<"positive" | "neutral" | "negative", number>;
 };
+
+export type PriceItem = {
+  ts: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+};
+
+export type PriceResponse = {
+  prices: PriceItem[];
+  currency: string;
+};
