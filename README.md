@@ -58,9 +58,11 @@ HUGGINGFACE_STOCK_API_KEY=your_huggingface_api_key
    ```
 
 ## 실행 화면
+Coachmark
 <img width="2559" height="1395" alt="image" src="https://github.com/user-attachments/assets/4903c139-a366-42b9-860d-7802e908e0d6" />
+메인 화면
 <img width="2559" height="1400" alt="image" src="https://github.com/user-attachments/assets/2dc7949f-4eac-47a8-a8d1-e5ae50ce6439" />
-<img width="2559" height="1400" alt="image" src="https://github.com/user-attachments/assets/94df773d-2356-4b3a-af15-d7bb204208ab" />
+검색 결과
 <img width="2558" height="1397" alt="image" src="https://github.com/user-attachments/assets/72c0a61f-be68-41e0-b643-5e7b7ab921ee" />
 <img width="2559" height="1400" alt="image" src="https://github.com/user-attachments/assets/fcdf3781-c412-4e4e-8151-93c7319c1833" />
 
